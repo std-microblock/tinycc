@@ -209,6 +209,7 @@ target("libtcc")
     local srcs = table.clone(core_sources)
     for _, f in ipairs(extra_srcs) do table.insert(srcs, f) end
     add_files(table.unpack(srcs))
+    add_headerfiles("*.h")
 
     if has_config("static") then
         set_kind("static")

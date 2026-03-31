@@ -532,9 +532,17 @@ LIBTCCAPI void *tcc_get_symbol(TCCState *s, const char *name)
 LIBTCCAPI int tcc_add_symbol(TCCState *s1, const char *name, const void *val)
 {
 #ifdef TCC_TARGET_PE
-    /* On x86_64 'val' might not be reachable with a 32bit offset.
-       So it is handled here as if it were in a DLL. */
-    pe_putimport(s1, 0, name, (uintptr_t)val);
+    /* When running in memory (TCC_OUTPUT_MEMORY) the address is always
+       reachable; use set_global_sym so the symbol is treated as a plain
+       absolute address rather than a DLL import.  For file output we
+       still need pe_putimport because of the 32-bit reloc limitation. */
+    if (s1->output_type == TCC_OUTPUT_MEMORY) {
+        set_global_sym(s1, name, NULL, (addr_t)(uintptr_t)val);
+    } else {
+        /* On x86_64 'val' might not be reachable with a 32bit offset.
+           So it is handled here as if it were in a DLL. */
+        pe_putimport(s1, 0, name, (uintptr_t)val);
+    }
 #else
     char buf[256];
     if (s1->leading_underscore) {

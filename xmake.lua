@@ -190,6 +190,11 @@ local function apply_common(T)
         add_syslinks("m", "dl", "pthread")
     end
 
+    -- MSVC defaults to C++ mode; force C compilation for TCC sources
+    if is_plat("windows") then
+        add_cflags("/TC", {force = true})
+    end
+
     if has_config("debug") then
         set_symbols("debug")
         set_optimize("none")
@@ -237,6 +242,11 @@ target("tcc")
     add_files("tcc.c")
     add_deps("libtcc")
     add_defines("ONE_SOURCE=0")
+
+    -- Don't build tcc executable when cross-compiling (e.g. for Android)
+    if not is_plat("linux", "macosx", "windows", "bsd") then
+        set_default(false)
+    end
 
     local T = native_target()
     apply_common(T)
@@ -295,11 +305,19 @@ end
 
 -- ----------------------------------------------------------------------------
 -- libtcc1.a  – the TCC runtime library, compiled *by* tcc itself
+-- Only built for native targets; skip when cross-compiling (e.g. Android).
 -- ----------------------------------------------------------------------------
 target("libtcc1")
     set_kind("phony")
-    set_default(true)
-    add_deps("tcc")
+    -- Only include in the default build on native host platforms.
+    -- Cross-compile targets (android, …) cannot run the freshly built tcc
+    -- binary on the host, so skip libtcc1 entirely in that case.
+    if is_plat("linux", "macosx", "windows", "bsd") then
+        set_default(true)
+        add_deps("tcc")
+    else
+        set_default(false)
+    end
 
     on_build(function(target)
         local tcc_bin  = target:dep("tcc"):targetfile()
@@ -367,6 +385,27 @@ target("libtcc1")
                 sdk = sdk:trim()
                 table.insert(xflags, "-isystem")
                 table.insert(xflags, sdk .. "/usr/include")
+            end
+        end
+        -- on Linux: help tcc find glibc internal headers (bits/*, gnu/*)
+        if is_plat("linux") then
+            local arch = os.arch()
+            local multiarch_map = {
+                x86_64 = "x86_64-linux-gnu",
+                x64    = "x86_64-linux-gnu",
+                arm64  = "aarch64-linux-gnu",
+                aarch64 = "aarch64-linux-gnu",
+                i386   = "i386-linux-gnu",
+                x86    = "i386-linux-gnu",
+                arm    = "arm-linux-gnueabihf",
+            }
+            local triplet = multiarch_map[arch]
+            if triplet then
+                local inc = "/usr/include/" .. triplet
+                if os.isdir(inc) then
+                    table.insert(xflags, "-I")
+                    table.insert(xflags, inc)
+                end
             end
         end
 

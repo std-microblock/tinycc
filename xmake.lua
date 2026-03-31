@@ -239,14 +239,10 @@ target_end()
 -- ----------------------------------------------------------------------------
 target("tcc")
     set_kind("binary")
+    set_default(false)
     add_files("tcc.c")
     add_deps("libtcc")
     add_defines("ONE_SOURCE=0")
-
-    -- Don't build tcc executable when cross-compiling (e.g. for Android)
-    if not is_plat("linux", "macosx", "windows", "bsd") then
-        set_default(false)
-    end
 
     local T = native_target()
     apply_common(T)
@@ -305,19 +301,11 @@ end
 
 -- ----------------------------------------------------------------------------
 -- libtcc1.a  – the TCC runtime library, compiled *by* tcc itself
--- Only built for native targets; skip when cross-compiling (e.g. Android).
 -- ----------------------------------------------------------------------------
 target("libtcc1")
     set_kind("phony")
-    -- Only include in the default build on native host platforms.
-    -- Cross-compile targets (android, …) cannot run the freshly built tcc
-    -- binary on the host, so skip libtcc1 entirely in that case.
-    if is_plat("linux", "macosx", "windows", "bsd") then
-        set_default(true)
-        add_deps("tcc")
-    else
-        set_default(false)
-    end
+    set_default(false)
+    add_deps("tcc")
 
     on_build(function(target)
         local tcc_bin  = target:dep("tcc"):targetfile()

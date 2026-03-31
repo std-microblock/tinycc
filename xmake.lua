@@ -177,7 +177,14 @@ local core_sources = {
 -- helper applied to both libtcc and tcc targets
 -- ----------------------------------------------------------------------------
 local function apply_common(T)
-    add_includedirs(".", "include")
+    -- On Windows/MSVC, do NOT add tinycc's include/ to the search path.
+    -- That directory contains TCC-specific stdarg.h / stddef.h which conflict
+    -- with MSVC's own headers.  The host compiler only needs the project root.
+    if is_plat("windows") then
+        add_includedirs(".")
+    else
+        add_includedirs(".", "include")
+    end
 
     local defs = target_defines[T] or {}
     for _, d in ipairs(defs) do add_defines(d) end
